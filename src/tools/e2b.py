@@ -5,6 +5,7 @@ from config.logger import get_logger
 
 logger = get_logger(__name__)
 
+
 @tool
 async def e2b_run_code(python_code: str) -> str:
     """
@@ -26,26 +27,26 @@ async def e2b_run_code(python_code: str) -> str:
         sbx = Sandbox.create()
         execution = sbx.run_code(python_code)
 
-        logger.info(f"Execution completed. Stdout: {len(execution.logs.stdout)} chars, "
-                   f"Stderr: {len(execution.logs.stderr)} chars")
+        logger.info(
+            f"Execution completed. Stdout: {len(execution.logs.stdout)} chars, "
+            f"Stderr: {len(execution.logs.stderr)} chars"
+        )
 
         result = {
             "success": True,
             "stdout": execution.logs.stdout,
             "stderr": execution.logs.stderr,
-            "results": [str(r) for r in execution.results] if execution.results else []
+            "results": [str(r) for r in execution.results] if execution.results else [],
         }
 
         return json.dumps(result, indent=2)
 
     except Exception as e:
         logger.error(f"E2B execution error: {e}")
-        return json.dumps({
-            "success": False,
-            "error": str(e),
-            "stdout": "",
-            "stderr": str(e)
-        }, indent=2)
+        return json.dumps(
+            {"success": False, "error": str(e), "stdout": "", "stderr": str(e)},
+            indent=2,
+        )
 
     finally:
         sbx.kill()

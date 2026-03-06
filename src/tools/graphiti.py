@@ -31,7 +31,9 @@ class GraphitiAddEventInput(BaseModel):
         "user",
         description="Source of the event (optional, e.g., 'user', 'system', 'email')",
     )
-    group_id: str = Field("default", description="Group ID for organizing events (optional)")
+    group_id: str = Field(
+        "default", description="Group ID for organizing events (optional)"
+    )
 
 
 class GraphitiEntityEdgesInput(BaseModel):
@@ -50,7 +52,9 @@ class GraphitiRemoveEpisodeInput(BaseModel):
 
 
 class GraphitiRecentEpisodesInput(BaseModel):
-    limit: int = Field(10, description="Number of recent episodes to retrieve (default: 10)")
+    limit: int = Field(
+        10, description="Number of recent episodes to retrieve (default: 10)"
+    )
     group_id: Optional[str] = Field(None, description="Filter by group ID (optional)")
 
 
@@ -80,13 +84,17 @@ class GraphitiSearchEventsInput(BaseModel):
         ),
     )
     group_id: Optional[str] = Field(None, description="Filter by group ID (optional)")
-    limit: int = Field(20, description="Maximum number of events to return (default: 20)")
+    limit: int = Field(
+        20, description="Maximum number of events to return (default: 20)"
+    )
 
 
 _graphiti_instance = None
 
 
-def _parse_iso_timestamp(timestamp_str: Optional[str], field_name: str) -> Optional[datetime]:
+def _parse_iso_timestamp(
+    timestamp_str: Optional[str], field_name: str
+) -> Optional[datetime]:
     if not timestamp_str:
         return None
     try:
@@ -105,8 +113,12 @@ def _format_episode(episode: Any) -> Dict[str, Any]:
         "name": episode.name,
         "content": getattr(episode, "content", ""),
         "source": str(source_value) if source_value else "",
-        "created_at": episode.created_at.isoformat() if hasattr(episode, "created_at") else None,
-        "valid_at": episode.valid_at.isoformat() if hasattr(episode, "valid_at") else None,
+        "created_at": episode.created_at.isoformat()
+        if hasattr(episode, "created_at")
+        else None,
+        "valid_at": episode.valid_at.isoformat()
+        if hasattr(episode, "valid_at")
+        else None,
         "group_id": getattr(episode, "group_id", ""),
         "uuid": getattr(episode, "uuid", ""),
     }
@@ -200,7 +212,9 @@ async def graphiti_remove_event(episode_uuid: str) -> Dict[str, Any]:
 
 
 @tool(args_schema=GraphitiEntityEdgesInput)
-async def graphiti_get_entity_edges(entity_name: str, group_id: Optional[str] = None) -> Dict[str, Any]:
+async def graphiti_get_entity_edges(
+    entity_name: str, group_id: Optional[str] = None
+) -> Dict[str, Any]:
     """
     Search for relationships and facts about entities in the knowledge graph.
     """
@@ -227,7 +241,9 @@ async def graphiti_get_entity_edges(entity_name: str, group_id: Optional[str] = 
                 "fact": getattr(edge, "fact", edge.name),
                 "source_id": edge.source_node_uuid,
                 "target_id": edge.target_node_uuid,
-                "created_at": edge.created_at.isoformat() if hasattr(edge, "created_at") else None,
+                "created_at": edge.created_at.isoformat()
+                if hasattr(edge, "created_at")
+                else None,
             }
         )
 
@@ -243,7 +259,9 @@ async def graphiti_get_entity_edges(entity_name: str, group_id: Optional[str] = 
 
 
 @tool(args_schema=GraphitiRecentEpisodesInput)
-async def graphiti_list_recent_episodes(limit: int = 10, group_id: Optional[str] = None) -> Dict[str, Any]:
+async def graphiti_list_recent_episodes(
+    limit: int = 10, group_id: Optional[str] = None
+) -> Dict[str, Any]:
     """
     List the most recent temporal episodes (events) from the knowledge graph.
     """

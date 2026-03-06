@@ -4,6 +4,7 @@ from typing import Self
 import os
 from dotenv import dotenv_values, load_dotenv
 
+
 class Config:
     _instance: Self | None = None
     _initialized = False

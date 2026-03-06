@@ -5,9 +5,7 @@ import os
 from typing import Final
 
 _DEFAULT_LOG_LEVEL: Final[str] = "INFO"
-_DEFAULT_LOG_FORMAT: Final[str] = (
-    "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
-)
+_DEFAULT_LOG_FORMAT: Final[str] = "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
 _DEFAULT_LOG_DATEFMT: Final[str] = "%Y-%m-%d %H:%M:%S"
 _LOGGER_NAMESPACE: Final[str] = "poc-skills"
 _is_configured = False

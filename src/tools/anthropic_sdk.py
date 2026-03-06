@@ -20,6 +20,7 @@ BETA_FLAGS = [
 
 _anthropic_client = None
 
+
 def _get_client() -> AsyncAnthropic:
     global _anthropic_client
     if _anthropic_client is None:
@@ -39,7 +40,7 @@ def _build_message_content(
     content: List[Dict[str, Any]] = []
     files_for_prompt: List[str] = []
 
-    for fid in (file_ids or []):
+    for fid in file_ids or []:
         if fid in files_to_exclude:
             content.append({"type": "container_upload", "file_id": fid})
             files_for_prompt.append(fid)
@@ -89,7 +90,10 @@ def _normalize_message_types(messages: List[Dict[str, Any]]) -> List[Dict[str, A
 
             if btype in ["tool_use", "server_tool_use"]:
                 new_block["type"] = "tool_use"
-                if new_block.get("name") in ["code_execution", "text_editor_code_execution"]:
+                if new_block.get("name") in [
+                    "code_execution",
+                    "text_editor_code_execution",
+                ]:
                     new_block["name"] = "text_editor_code_execution"
             elif btype in [
                 "tool_result",
@@ -120,7 +124,9 @@ def _normalize_message_types(messages: List[Dict[str, Any]]) -> List[Dict[str, A
     return normalized_messages
 
 
-def _bridge_missing_tool_results(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def _bridge_missing_tool_results(
+    messages: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
     final_history: List[Dict[str, Any]] = []
 
     for i, msg in enumerate(messages):
@@ -225,7 +231,8 @@ async def anthopic_ask_claude(
             container["id"] = session_id
         if skill_ids:
             container["skills"] = [
-                {"type": "anthropic", "skill_id": sid, "version": "latest"} for sid in skill_ids
+                {"type": "anthropic", "skill_id": sid, "version": "latest"}
+                for sid in skill_ids
             ]
 
         try:
@@ -253,14 +260,19 @@ async def anthopic_ask_claude(
                     unsupported_fid = match.group(1)
                     if unsupported_fid not in files_to_exclude:
                         files_to_exclude.add(unsupported_fid)
-                        logger.info("Rerouting %s as container_upload and retrying", unsupported_fid)
+                        logger.info(
+                            "Rerouting %s as container_upload and retrying",
+                            unsupported_fid,
+                        )
                         continue
 
                 # fallback: reroute first document file that isn't excluded yet
                 for fid in file_ids or []:
                     if fid not in files_to_exclude:
                         files_to_exclude.add(fid)
-                        logger.info("Rerouting %s as container_upload and retrying", fid)
+                        logger.info(
+                            "Rerouting %s as container_upload and retrying", fid
+                        )
                         break
                 continue
 
@@ -344,8 +356,8 @@ async def anthopic_upload_file(
     data = upload_result.model_dump(mode="json")
     response_session_id = None
     if isinstance(data.get("container"), dict):
-        response_session_id = (
-            data["container"].get("id") or data["container"].get("session_id")
+        response_session_id = data["container"].get("id") or data["container"].get(
+            "session_id"
         )
     final_session_id = response_session_id or session_id
 

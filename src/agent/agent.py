@@ -4,24 +4,26 @@ import uuid
 from typing import TypedDict, Annotated, Sequence, Optional, List, Dict
 from langgraph.graph import StateGraph, END
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, ToolMessage
+
 # from langchain_anthropic import ChatAnthropic
 from langchain_google_genai import ChatGoogleGenerativeAI
 from config.config import Config
-from tools.anthropic import anthopic_ask_claude, anthopic_download_file, anthopic_upload_file
 from tools.e2b import e2b_run_code
 from tools.graphiti import (
     graphiti_add_event,
     graphiti_remove_event,
     graphiti_get_entity_edges,
     graphiti_search_events,
-    graphiti_list_recent_episodes
+    graphiti_list_recent_episodes,
 )
 
 
 config = Config()
 
+
 class GraphState(TypedDict):
     """State for the agent graph."""
+
     messages: Annotated[Sequence[BaseMessage], "The messages in the conversation"]
     uploaded_files: List[str]
     enabled_skills: List[str]
@@ -29,20 +31,20 @@ class GraphState(TypedDict):
     e2b_session_id: Optional[str]
     extracted_data: Dict[str, str]
 
-class Agent:
 
+class Agent:
     def __init__(self):
         self.graph = None
         self.tools = [
-            # ask_claude, 
-            # download_file, 
+            # ask_claude,
+            # download_file,
             # upload_file,
             e2b_run_code,
             graphiti_add_event,
             graphiti_remove_event,
             graphiti_get_entity_edges,
             graphiti_search_events,
-            graphiti_list_recent_episodes
+            graphiti_list_recent_episodes,
         ]
         # self.llm = ChatAnthropic(
         #     model=config.get("CLAUDE_MODEL"),
@@ -202,16 +204,22 @@ class Agent:
             "You MUST use the 'base64_ref' parameter, NOT the 'path' parameter:",
             "  ✅ CORRECT: anthropic_upload_file(base64_ref='base64_abc123', filename='file.pdf')",
             "  ❌ WRONG: anthropic_upload_file(path='base64_abc123')  # This will fail!",
-            "The system will automatically inject the real base64 content when you use base64_ref."
+            "The system will automatically inject the real base64 content when you use base64_ref.",
         )
 
         return AIMessage(content="\n".join(context))
 
-    def _update_state_from_tool(self, state: Dict, tool_name: str, tool_input: Dict, result: str) -> dict:
+    def _update_state_from_tool(
+        self, state: Dict, tool_name: str, tool_input: Dict, result: str
+    ) -> dict:
         """Update state based on tool execution."""
         import re
 
-        if tool_name.startswith("anthropic_") or tool_name in {"ask_claude", "upload_file", "download_file"}:
+        if tool_name.startswith("anthropic_") or tool_name in {
+            "ask_claude",
+            "upload_file",
+            "download_file",
+        }:
             # Extract file_id from upload_file
             if "upload_file" in tool_name or tool_name == "upload_file":
                 file_match = re.search(r'"file_id":\s*"([^"]+)"', result)
@@ -231,11 +239,11 @@ class Agent:
 
     async def _interactive_loop(self):
         """Run the interactive command loop."""
-        print("="*60)
+        print("=" * 60)
         print("Multi-MCP LangGraph Client")
-        print("="*60)
+        print("=" * 60)
         print("Commands: /quit, /status, or type your message")
-        print("="*60 + "\n")
+        print("=" * 60 + "\n")
 
         state = {
             "messages": [],
@@ -243,7 +251,7 @@ class Agent:
             "enabled_skills": [],
             "session_id": None,
             "e2b_session_id": None,
-            "extracted_data": {}
+            "extracted_data": {},
         }
 
         while True:
@@ -278,8 +286,11 @@ class Agent:
                                     print(f"💭 {last_msg.content}")
                                 elif isinstance(last_msg.content, list):
                                     for item in last_msg.content:
-                                        if isinstance(item, dict) and item.get('type') == 'text':
-                                            if item.get('text'):
+                                        if (
+                                            isinstance(item, dict)
+                                            and item.get("type") == "text"
+                                        ):
+                                            if item.get("text"):
                                                 print(f"💭 {item['text']}")
 
                             elif isinstance(last_msg, ToolMessage):
@@ -297,6 +308,7 @@ class Agent:
             except Exception as e:
                 print(f"\n❌ Error: {e}")
                 import traceback
+
                 traceback.print_exc()
 
     async def _build_graph(self):
@@ -328,17 +340,31 @@ class Agent:
             tool_calls = getattr(last_message, "tool_calls", []) or []
 
             for tool_call in tool_calls:
-                tool_name = tool_call.get("name") if isinstance(tool_call, dict) else tool_call.name
-                tool_input = dict(tool_call.get("args", {}) or {}) if isinstance(tool_call, dict) else dict(tool_call.args or {})
-                tool_id = tool_call.get("id") if isinstance(tool_call, dict) else tool_call.id
+                tool_name = (
+                    tool_call.get("name")
+                    if isinstance(tool_call, dict)
+                    else tool_call.name
+                )
+                tool_input = (
+                    dict(tool_call.get("args", {}) or {})
+                    if isinstance(tool_call, dict)
+                    else dict(tool_call.args or {})
+                )
+                tool_id = (
+                    tool_call.get("id") if isinstance(tool_call, dict) else tool_call.id
+                )
 
                 print(f"\n🔧 Executing: {tool_name}")
                 print(f"📋 Tool Input: {json.dumps(tool_input, indent=2)[:500]}")
 
                 tool = tools_by_name.get(tool_name)
                 if not tool:
-                    error_text = json.dumps({"error": True, "message": f"Tool not found: {tool_name}"})
-                    tool_results.append(ToolMessage(content=error_text, tool_call_id=tool_id))
+                    error_text = json.dumps(
+                        {"error": True, "message": f"Tool not found: {tool_name}"}
+                    )
+                    tool_results.append(
+                        ToolMessage(content=error_text, tool_call_id=tool_id)
+                    )
                     continue
 
                 # Backward compatibility for prompts that pass base64_ref.
@@ -347,10 +373,14 @@ class Agent:
                     if ref_id in extracted_data:
                         tool_input["base64_content"] = extracted_data[ref_id]
                         tool_input.setdefault("path", "")
-                        print(f"📦 Injected stored base64 data ({len(extracted_data[ref_id])} chars)")
+                        print(
+                            f"📦 Injected stored base64 data ({len(extracted_data[ref_id])} chars)"
+                        )
 
                 # Reuse Anthropic container when available.
-                if tool_name in {"ask_claude", "upload_file"} and state.get("session_id"):
+                if tool_name in {"ask_claude", "upload_file"} and state.get(
+                    "session_id"
+                ):
                     tool_input.setdefault("session_id", state["session_id"])
 
                 try:
@@ -361,25 +391,35 @@ class Agent:
                 if isinstance(result_obj, str):
                     result_text = result_obj
                 else:
-                    result_text = json.dumps(result_obj, ensure_ascii=False, default=str)
+                    result_text = json.dumps(
+                        result_obj, ensure_ascii=False, default=str
+                    )
 
                 display_result = result_text
-                result_preview = result_text[:300] + ("..." if len(result_text) > 300 else "")
+                result_preview = result_text[:300] + (
+                    "..." if len(result_text) > 300 else ""
+                )
                 print(f"📤 Result preview: {result_preview}")
 
-                base64_match = re.search(r'BASE64:([A-Za-z0-9+/=]{100,})', result_text)
+                base64_match = re.search(r"BASE64:([A-Za-z0-9+/=]{100,})", result_text)
                 if base64_match:
                     base64_data = base64_match.group(1)
                     ref_id = f"base64_{uuid.uuid4().hex[:8]}"
                     extracted_data[ref_id] = base64_data
                     display_result = result_text.replace(
                         base64_data,
-                        f"<BASE64_DATA_EXTRACTED: {len(base64_data)} chars, ref={ref_id}>"
+                        f"<BASE64_DATA_EXTRACTED: {len(base64_data)} chars, ref={ref_id}>",
                     )
-                    print(f"📦 Extracted large base64 ({len(base64_data)} chars) → {ref_id}")
+                    print(
+                        f"📦 Extracted large base64 ({len(base64_data)} chars) → {ref_id}"
+                    )
 
-                tool_results.append(ToolMessage(content=display_result, tool_call_id=tool_id))
-                state = self._update_state_from_tool(state, tool_name, tool_input, result_text)
+                tool_results.append(
+                    ToolMessage(content=display_result, tool_call_id=tool_id)
+                )
+                state = self._update_state_from_tool(
+                    state, tool_name, tool_input, result_text
+                )
 
             return {
                 "messages": messages + tool_results,
@@ -387,7 +427,7 @@ class Agent:
                 "enabled_skills": state.get("enabled_skills", []),
                 "session_id": state.get("session_id"),
                 "e2b_session_id": state.get("e2b_session_id"),
-                "extracted_data": extracted_data
+                "extracted_data": extracted_data,
             }
 
         # Define routing function
@@ -396,11 +436,11 @@ class Agent:
             messages = state["messages"]
             last_message = messages[-1]
 
-            if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
+            if hasattr(last_message, "tool_calls") and last_message.tool_calls:
                 return "tools"
 
-            if hasattr(last_message, 'additional_kwargs'):
-                tool_use = last_message.additional_kwargs.get('tool_use', [])
+            if hasattr(last_message, "additional_kwargs"):
+                tool_use = last_message.additional_kwargs.get("tool_use", [])
                 if tool_use:
                     return "tools"
 
@@ -412,16 +452,14 @@ class Agent:
         workflow.add_node("tools", tool_node)
         workflow.set_entry_point("agent")
         workflow.add_conditional_edges(
-            "agent",
-            should_continue,
-            {"tools": "tools", END: END}
+            "agent", should_continue, {"tools": "tools", END: END}
         )
         workflow.add_edge("tools", "agent")
 
         self.graph = workflow.compile()
 
     async def run(self):
-        print(f"\n✅ Initializing...")
+        print("\n✅ Initializing...")
 
         # Build the agent graph
         await self._build_graph()

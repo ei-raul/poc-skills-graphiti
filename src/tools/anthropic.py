@@ -4,7 +4,6 @@ import json
 import mimetypes
 import httpx
 import base64
-import httpx
 from typing import Dict, Any, Optional, List, Set, Tuple
 from utils.http import request_with_retry
 from config.logger import get_logger
@@ -17,10 +16,9 @@ logger = get_logger(__name__)
 config = Config()
 anthropic_config = AnthropicConfig()
 
+
 def _build_message_content(
-    prompt: Optional[str],
-    file_ids: Optional[List[str]],
-    files_to_exclude: Set[str]
+    prompt: Optional[str], file_ids: Optional[List[str]], files_to_exclude: Set[str]
 ) -> Tuple[List[Dict[str, Any]], List[str]]:
     """
     Build message content blocks with file routing.
@@ -36,24 +34,19 @@ def _build_message_content(
     content: List[Dict[str, Any]] = []
     files_for_prompt: List[str] = []
 
-    for fid in (file_ids or []):
+    for fid in file_ids or []:
         if fid in files_to_exclude:
             # Use container_upload for files that can't be document blocks
-            content.append({
-                "type": "container_upload",
-                "file_id": fid
-            })
-            logger.debug(f"File {fid} added as container_upload (accessible via code execution)")
+            content.append({"type": "container_upload", "file_id": fid})
+            logger.debug(
+                f"File {fid} added as container_upload (accessible via code execution)"
+            )
             files_for_prompt.append(fid)
         else:
             # Try as document block first (for .txt/.pdf direct reading)
-            content.append({
-                "type": "document",
-                "source": {
-                    "type": "file",
-                    "file_id": fid
-                }
-            })
+            content.append(
+                {"type": "document", "source": {"type": "file", "file_id": fid}}
+            )
             logger.debug(f"File {fid} added as document block")
 
     # Add prompt text
@@ -62,11 +55,14 @@ def _build_message_content(
         # When using container_upload, inform Claude the files are accessible
         file_count = len(files_for_prompt)
         prompt_text = f"{prompt}\n\n(Note: {file_count} file{'s' if file_count > 1 else ''} uploaded to container and accessible via code execution)"
-        logger.info(f"Routed {file_count} file(s) to container_upload (accessible in container filesystem)")
+        logger.info(
+            f"Routed {file_count} file(s) to container_upload (accessible in container filesystem)"
+        )
 
     content.append({"type": "text", "text": prompt_text})
 
     return content, files_for_prompt
+
 
 def _merge_consecutive_messages(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
@@ -87,6 +83,7 @@ def _merge_consecutive_messages(messages: List[Dict[str, Any]]) -> List[Dict[str
         else:
             merged_messages.append(msg)
     return merged_messages
+
 
 def _normalize_message_types(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
@@ -111,11 +108,18 @@ def _normalize_message_types(messages: List[Dict[str, Any]]) -> List[Dict[str, A
             # Normalize tool_use (standard API block type)
             if btype in ["tool_use", "server_tool_use"]:
                 new_block["type"] = "tool_use"
-                if new_block.get("name") in ["code_execution", "text_editor_code_execution"]:
+                if new_block.get("name") in [
+                    "code_execution",
+                    "text_editor_code_execution",
+                ]:
                     new_block["name"] = "text_editor_code_execution"
 
             # Normalize tool_result (standard API block type)
-            elif btype in ["tool_result", "code_execution_tool_result", "text_editor_code_execution_tool_result"]:
+            elif btype in [
+                "tool_result",
+                "code_execution_tool_result",
+                "text_editor_code_execution_tool_result",
+            ]:
                 new_block["type"] = "tool_result"
                 content = new_block.get("content")
 
@@ -144,7 +148,10 @@ def _normalize_message_types(messages: List[Dict[str, Any]]) -> List[Dict[str, A
 
     return normalized_messages
 
-def _bridge_missing_tool_results(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+
+def _bridge_missing_tool_results(
+    messages: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
     """
     Add bridging tool results for dangling tool_use blocks.
 
@@ -163,7 +170,9 @@ def _bridge_missing_tool_results(messages: List[Dict[str, Any]]) -> List[Dict[st
         final_history.append(msg)
 
         if msg["role"] == "assistant":
-            tool_use_ids = [b["id"] for b in msg["content"] if b.get("type") == "tool_use"]
+            tool_use_ids = [
+                b["id"] for b in msg["content"] if b.get("type") == "tool_use"
+            ]
             if tool_use_ids:
                 # Check next message (must be User)
                 next_msg = messages[i + 1] if i + 1 < len(messages) else None
@@ -171,7 +180,8 @@ def _bridge_missing_tool_results(messages: List[Dict[str, Any]]) -> List[Dict[st
                 # Ensure we have a User msg to attach results to
                 if next_msg and next_msg["role"] == "user":
                     result_ids = set(
-                        b.get("tool_use_id") for b in next_msg["content"]
+                        b.get("tool_use_id")
+                        for b in next_msg["content"]
                         if b.get("type") == "tool_result"
                     )
 
@@ -186,22 +196,25 @@ def _bridge_missing_tool_results(messages: List[Dict[str, Any]]) -> List[Dict[st
                                 "Error: Tool execution was interrupted by user input "
                                 "before completion. Please retry the previous action."
                             )
-                            injected_blocks.append({
-                                "type": "tool_result",
-                                "tool_use_id": tid,
-                                "content": content,
-                                "is_error": True
-                            })
+                            injected_blocks.append(
+                                {
+                                    "type": "tool_result",
+                                    "tool_use_id": tid,
+                                    "content": content,
+                                    "is_error": True,
+                                }
+                            )
 
                         next_msg["content"] = injected_blocks + next_msg["content"]
 
     return final_history
 
+
 def _build_payload(
     model: str,
     messages: List[Dict[str, Any]],
     skill_ids: Optional[List[str]],
-    session_id: Optional[str]
+    session_id: Optional[str],
 ) -> Dict[str, Any]:
     """
     Build the API request payload.
@@ -220,7 +233,7 @@ def _build_payload(
         "max_tokens": 16384,  # Increased to 16K for complex PDF operations with skills
         "system": anthropic_config.default_system_prompt,
         "messages": messages,
-        "tools": [{"type": "code_execution_20250825", "name": "code_execution"}]
+        "tools": [{"type": "code_execution_20250825", "name": "code_execution"}],
     }
 
     # Include container only if we have session_id or skills
@@ -239,6 +252,7 @@ def _build_payload(
         payload["container"] = container
 
     return payload
+
 
 def _log_payload_debug(messages: List[Dict[str, Any]]) -> None:
     """
@@ -261,6 +275,7 @@ def _log_payload_debug(messages: List[Dict[str, Any]]) -> None:
             contents.append(f"[{binfo}]")
         logger.debug(f"  {i}. {m['role']}: {' '.join(contents)}")
 
+
 def _dump_payload_on_error(payload: Dict[str, Any]) -> None:
     """
     Dump payload to file for debugging on error.
@@ -276,10 +291,9 @@ def _dump_payload_on_error(payload: Dict[str, Any]) -> None:
     except Exception as de:
         logger.warning(f"Could not dump payload: {de}")
 
+
 def _handle_api_error(
-    response: Any,
-    payload: Dict[str, Any],
-    files_to_exclude: Set[str]
+    response: Any, payload: Dict[str, Any], files_to_exclude: Set[str]
 ) -> Tuple[bool, Optional[str], Optional[Dict[str, Any]]]:
     """
     Handle API error responses.
@@ -303,9 +317,9 @@ def _handle_api_error(
             # Check for unsupported file format/extension errors
             # Match both "unsupported extension" and "Unsupported document file format"
             is_file_format_error = (
-                ("unsupported extension" in error_msg.lower() and "document content block" in error_msg.lower()) or
-                ("unsupported document file format" in error_msg.lower())
-            )
+                "unsupported extension" in error_msg.lower()
+                and "document content block" in error_msg.lower()
+            ) or ("unsupported document file format" in error_msg.lower())
 
             if is_file_format_error:
                 # Try to extract file_id from error message
@@ -314,7 +328,9 @@ def _handle_api_error(
                     unsupported_fid = match.group(1)
                     if unsupported_fid not in files_to_exclude:
                         files_to_exclude.add(unsupported_fid)
-                        logger.info(f"Rerouting {unsupported_fid} (unsupported as document block) and retrying...")
+                        logger.info(
+                            f"Rerouting {unsupported_fid} (unsupported as document block) and retrying..."
+                        )
                         return True, unsupported_fid, None
                 else:
                     # If we can't extract file_id from message, check the payload
@@ -327,7 +343,9 @@ def _handle_api_error(
                                         file_id = block.get("source", {}).get("file_id")
                                         if file_id and file_id not in files_to_exclude:
                                             files_to_exclude.add(file_id)
-                                            logger.info(f"Rerouting {file_id} (detected from payload) and retrying...")
+                                            logger.info(
+                                                f"Rerouting {file_id} (detected from payload) and retrying..."
+                                            )
                                             return True, file_id, None
         except Exception:
             pass
@@ -346,10 +364,11 @@ def _handle_api_error(
     error_response = {
         "error": True,
         "status_code": response.status_code,
-        "message": f"API error {response.status_code}: {error_msg}"
+        "message": f"API error {response.status_code}: {error_msg}",
     }
 
     return False, None, error_response
+
 
 def _extract_session_id(result: Dict[str, Any]) -> Optional[str]:
     """
@@ -362,10 +381,13 @@ def _extract_session_id(result: Dict[str, Any]) -> Optional[str]:
         Session ID if found, None otherwise
     """
     if "container" in result and isinstance(result["container"], dict):
-        container_id = result["container"].get("id") or result["container"].get("session_id")
+        container_id = result["container"].get("id") or result["container"].get(
+            "session_id"
+        )
         if container_id:
             return container_id
     return None
+
 
 @tool
 async def anthopic_ask_claude(
@@ -374,7 +396,7 @@ async def anthopic_ask_claude(
     skill_ids: Optional[List[str]] = None,
     session_id: Optional[str] = None,
     history: Optional[List[Dict[str, Any]]] = None,
-    model: str = "claude-sonnet-4-5-20250929"
+    model: str = "claude-sonnet-4-5-20250929",
 ) -> Dict[str, Any]:
     """
     Send a prompt or conversation history to Claude via the Anthropic API.
@@ -395,8 +417,12 @@ async def anthopic_ask_claude(
     # Validate session_id format - must be container_* with actual content after prefix
     # Ignore invalid formats to prevent API errors
     if session_id:
-        if not session_id.startswith('container_') or len(session_id) <= len('container_'):
-            logger.warning(f"Invalid session_id format '{session_id}'. Must be 'container_' followed by ID. Ignoring.")
+        if not session_id.startswith("container_") or len(session_id) <= len(
+            "container_"
+        ):
+            logger.warning(
+                f"Invalid session_id format '{session_id}'. Must be 'container_' followed by ID. Ignoring."
+            )
             session_id = None
 
     if not history and not prompt:
@@ -435,11 +461,11 @@ async def anthopic_ask_claude(
         try:
             async with httpx.AsyncClient(timeout=anthropic_config.timeout) as client:
                 response = await request_with_retry(
-                    client, 
-                    "post", 
+                    client,
+                    "post",
                     f"{anthropic_config.base_url}/messages",
                     headers=headers,
-                    json=payload
+                    json=payload,
                 )
 
                 if response.status_code != 200:
@@ -469,27 +495,33 @@ async def anthopic_ask_claude(
                 "error": True,
                 "status_code": 408,
                 "message": f"Request timed out after {anthropic_config.timeout} seconds. "
-                          "If processing many files or using skills, this may take longer. "
-                          "Consider using E2B to generate content and upload via Anthropic instead."
+                "If processing many files or using skills, this may take longer. "
+                "Consider using E2B to generate content and upload via Anthropic instead.",
             }
         except httpx.ConnectError as e:
             return {
                 "error": True,
                 "status_code": 0,
-                "message": f"Connection error: {e}"
+                "message": f"Connection error: {e}",
             }
         except Exception as e:
             return {
                 "error": True,
                 "status_code": 0,
-                "message": f"{type(e).__name__}: {e}"
+                "message": f"{type(e).__name__}: {e}",
             }
 
     # Should not be reached but just in case
     return {"error": True, "message": "Failed to route files correctly."}
 
+
 @tool
-async def anthopic_upload_file(path: str, session_id: Optional[str] = None, base64_content: Optional[str] = None, filename: Optional[str] = None) -> Dict[str, Any]:
+async def anthopic_upload_file(
+    path: str,
+    session_id: Optional[str] = None,
+    base64_content: Optional[str] = None,
+    filename: Optional[str] = None,
+) -> Dict[str, Any]:
     """
     Uploads a file to Anthropic API and returns a dictionary with file_id and optional session_id.
 
@@ -527,7 +559,7 @@ async def anthopic_upload_file(path: str, session_id: Optional[str] = None, base
     # Handle file path input
     else:
         # Check if path looks like a base64 ref (common mistake)
-        if path.startswith('base64_'):
+        if path.startswith("base64_"):
             raise ValueError(
                 f"PARAMETER ERROR: You used path='{path}' but this looks like a base64 reference!\n"
                 f"The 'base64_ref' parameter exists for this purpose.\n"
@@ -552,13 +584,17 @@ async def anthopic_upload_file(path: str, session_id: Optional[str] = None, base
             file_content = f.read()
 
     # Smart Upload: Auto-create container for non-.txt/.pdf files
-    needs_container = file_ext not in ['.txt', '.pdf']
+    needs_container = file_ext not in [".txt", ".pdf"]
 
     # Validate session_id format - must be container_* with actual content after prefix
     # If agent passes an invalid format, treat as if no session_id was provided
     if session_id:
-        if not session_id.startswith('container_') or len(session_id) <= len('container_'):
-            logger.warning(f"Invalid session_id format '{session_id}'. Must be 'container_' followed by ID. Ignoring.")
+        if not session_id.startswith("container_") or len(session_id) <= len(
+            "container_"
+        ):
+            logger.warning(
+                f"Invalid session_id format '{session_id}'. Must be 'container_' followed by ID. Ignoring."
+            )
             session_id = None
 
     if needs_container and not session_id:
@@ -570,25 +606,29 @@ async def anthopic_upload_file(path: str, session_id: Optional[str] = None, base
             # This ensures a container is actually created and returned
             response = await anthopic_ask_claude(
                 prompt="Execute: import os; print('Container initialized')",
-                model="claude-sonnet-4-5-20250929"
+                model="claude-sonnet-4-5-20250929",
             )
 
             session_id = response.get("session_id")
 
             if session_id:
-                logger.info(f"📦 Auto-created container {session_id} for {file_ext} upload")
+                logger.info(
+                    f"📦 Auto-created container {session_id} for {file_ext} upload"
+                )
             else:
-                logger.warning("Container creation did not return session_id. Upload may fail for non-.txt/.pdf files.")
+                logger.warning(
+                    "Container creation did not return session_id. Upload may fail for non-.txt/.pdf files."
+                )
 
         except Exception as e:
             logger.error(f"Failed to auto-create container: {e}")
-            logger.warning("Attempting upload anyway - may fail for non-.txt/.pdf files")
+            logger.warning(
+                "Attempting upload anyway - may fail for non-.txt/.pdf files"
+            )
 
     headers = anthropic_config.get_headers()
 
-    files = {
-        "file": (filename, file_content, mime_type)
-    }
+    files = {"file": (filename, file_content, mime_type)}
 
     async with httpx.AsyncClient(timeout=anthropic_config.upload_timeout) as client:
         data_payload = {}
@@ -597,11 +637,17 @@ async def anthopic_upload_file(path: str, session_id: Optional[str] = None, base
             data_payload["container"] = json.dumps({"id": session_id})
 
         response = await request_with_retry(
-            client, "post", f"{anthropic_config.base_url}/files",
-            headers=headers, files=files, data=data_payload
+            client,
+            "post",
+            f"{anthropic_config.base_url}/files",
+            headers=headers,
+            files=files,
+            data=data_payload,
         )
         if response.status_code != 200:
-            logger.error(f"Upload failed with status {response.status_code}: {response.text}")
+            logger.error(
+                f"Upload failed with status {response.status_code}: {response.text}"
+            )
 
         response.raise_for_status()
         data = response.json()
@@ -609,21 +655,27 @@ async def anthopic_upload_file(path: str, session_id: Optional[str] = None, base
         # Return both file ID and session ID
         # Prefer session_id from response, but keep auto-created one if response doesn't have it
         response_session_id = data.get("session_id")
-        if not response_session_id and "container" in data and isinstance(data["container"], dict):
-            response_session_id = data["container"].get("id") or data["container"].get("session_id")
+        if (
+            not response_session_id
+            and "container" in data
+            and isinstance(data["container"], dict)
+        ):
+            response_session_id = data["container"].get("id") or data["container"].get(
+                "session_id"
+            )
 
         # Use response session_id if available, otherwise keep the auto-created one
         final_session_id = response_session_id or session_id
 
         if final_session_id:
-            logger.info(f"Upload successful. File: {data.get('id')}, Container: {final_session_id}")
+            logger.info(
+                f"Upload successful. File: {data.get('id')}, Container: {final_session_id}"
+            )
         else:
             logger.info(f"Upload successful. File: {data.get('id')}, No container")
 
-        return {
-            "file_id": data.get("id"),
-            "session_id": final_session_id
-        }
+        return {"file_id": data.get("id"), "session_id": final_session_id}
+
 
 @tool
 async def anthopic_download_file(file_id: str, output_dir: Optional[str] = None) -> str:
@@ -643,25 +695,29 @@ async def anthopic_download_file(file_id: str, output_dir: Optional[str] = None)
     async with httpx.AsyncClient(timeout=anthropic_config.upload_timeout) as client:
         # Get file content with retry
         response = await request_with_retry(
-            client, "get", f"{anthropic_config.base_url}/files/{file_id}/content",
-            headers=headers
+            client,
+            "get",
+            f"{anthropic_config.base_url}/files/{file_id}/content",
+            headers=headers,
         )
         response.raise_for_status()
         content = response.content
 
         # Get file metadata for filename
         meta_response = await request_with_retry(
-            client, "get", f"{anthropic_config.base_url}/files/{file_id}",
-            headers=headers
+            client,
+            "get",
+            f"{anthropic_config.base_url}/files/{file_id}",
+            headers=headers,
         )
         filename = f"{file_id}.bin"
         if meta_response.status_code == 200:
             meta = meta_response.json()
             if "filename" in meta:
                 filename = meta["filename"]
-        
+
         output_path = os.path.join(output_dir, filename)
         with open(output_path, "wb") as f:
             f.write(content)
-            
+
         return output_path
