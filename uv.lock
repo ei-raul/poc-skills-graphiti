@@ -806,6 +806,7 @@ name = "poc-skills"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "anthropic" },
     { name = "dotenv" },
     { name = "e2b-code-interpreter" },
     { name = "graphiti-core" },
@@ -817,6 +818,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "anthropic", specifier = ">=0.84.0" },
     { name = "dotenv", specifier = ">=0.9.9" },
     { name = "e2b-code-interpreter", specifier = ">=2.4.1" },
     { name = "graphiti-core", specifier = ">=0.28.1" },

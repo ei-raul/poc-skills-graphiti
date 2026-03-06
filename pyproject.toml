@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "anthropic>=0.84.0",
     "dotenv>=0.9.9",
     "e2b-code-interpreter>=2.4.1",
     "graphiti-core>=0.28.1",
