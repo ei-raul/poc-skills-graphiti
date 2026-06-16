@@ -18,7 +18,7 @@ class Config:
         if self._initialized:
             return
 
-        env_path = Path(env_file).resolve()
+        env_path = Path(__file__).resolve().parent.parent.parent / env_file
         load_dotenv(dotenv_path=env_path)
 
         self._values: dict[str, str] = {}
