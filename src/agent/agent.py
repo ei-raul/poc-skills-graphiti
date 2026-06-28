@@ -12,6 +12,7 @@ from tools.graphiti import (
     graphiti_search_events,
     graphiti_list_recent_episodes,
 )
+from tools.google_tools import google_grounding_search
 from agent.nodes import build_agent_node, build_tool_node, build_routing_node
 
 
@@ -39,6 +40,7 @@ class Agent:
             graphiti_get_entity_edges,
             graphiti_search_events,
             graphiti_list_recent_episodes,
+            google_grounding_search,
         ]
         self.llm = ChatGoogleGenerativeAI(
             model=config.get("GEMINI_MODEL", "gemini-2.5-pro"),
