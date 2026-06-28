@@ -59,7 +59,7 @@ def google_grounding_search(text: str, url_list: Optional[List[str]] = None) -> 
         grounding_tool = types.Tool(google_search=types.GoogleSearch())
         content_config = types.GenerateContentConfig(tools=[grounding_tool])
         response = client.models.generate_content(
-            model=config.GOOGLE_TOOL_MODEL,
+            model=config.GEMINI_MODEL,
             contents=text,
             config=content_config,
         )
