@@ -38,7 +38,28 @@ Stores and queries a temporal knowledge graph of events.
   graphiti_search_events(entity_name='Project X', after_timestamp='...')
   ```
 
-### 4. Google Grounding Search (`google_grounding_search`)
+### 4. HTTP Genérico (`http_*`)
+
+Realiza chamadas HTTP a qualquer API REST externa.
+
+- **Use para:** integrar com APIs externas (GitHub, Notion, Linear, Slack, qualquer REST API), buscar dados de endpoints públicos ou privados, enviar webhooks
+- **Não use** quando `google_grounding_search` já resolve (perguntas gerais da web) ou quando os dados já estão no grafo Graphiti
+- **Tools:**
+  - `http_get(url, params?, headers?)` — busca dados; use para endpoints GET e recursos públicos
+  - `http_post(url, body?, form_data?, headers?)` — envia dados JSON ou form-encoded
+  - `http_request(method, url, params?, body?, headers?)` — para PUT, PATCH, DELETE ou qualquer método não coberto acima
+- **Retorno:** `{ status_code, ok (bool), headers, body (JSON ou texto) }`
+- **Erros:** se `ok=false`, inspecione `status_code` e `body` para entender o problema antes de retentar
+
+```
+# Exemplos
+http_get(url='https://api.github.com/repos/owner/repo')
+http_get(url='https://api.example.com/search', params={'q': 'python'}, headers={'Authorization': 'Bearer TOKEN'})
+http_post(url='https://api.example.com/items', body={'name': 'test'})
+http_request(method='DELETE', url='https://api.example.com/items/1', headers={'Authorization': 'Bearer TOKEN'})
+```
+
+### 5. Google Grounding Search (`google_grounding_search`)
 
 Performs a real-time web search using Google's grounding API via a Gemini model.
 
@@ -92,6 +113,7 @@ Use for formatted documents (PDFs from code, styled reports).
 
 | Task type | Use |
 |-----------|-----|
+| Call a REST API (GitHub, Notion, etc.) | `http_get` / `http_post` / `http_request` |
 | Recent or external information needed | `google_grounding_search` |
 | Python computation, result as text | E2B only |
 | Document processing (uploaded file) | Anthropic only |
