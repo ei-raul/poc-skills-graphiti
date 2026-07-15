@@ -3,6 +3,7 @@ from typing import Any, Dict, Optional
 from graphiti_core import Graphiti
 from graphiti_core.llm_client.config import LLMConfig
 from graphiti_core.llm_client.gemini_client import GeminiClient
+from graphiti_core.embedder.gemini import GeminiEmbedder, GeminiEmbedderConfig
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 from config.config import Config
@@ -136,11 +137,17 @@ async def get_graphiti() -> Graphiti:
         )
         llm_client = GeminiClient(config=llm_config)
 
+        embedder_config = GeminiEmbedderConfig(
+            api_key=config.get("GOOGLE_API_KEY"),
+        )
+        embedder = GeminiEmbedder(config=embedder_config)
+
         _graphiti_instance = Graphiti(
             uri=config.get("NEO4J_URI"),
             user=config.get("NEO4J_USER"),
             password=config.get("NEO4J_PASSWORD"),
             llm_client=llm_client,
+            embedder=embedder,
         )
 
         logger.info("Building Neo4j indices and constraints...")
